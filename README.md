@@ -4,6 +4,8 @@ A port of the **Tibia 7.6 client** to PlayStation 2, playable over the network a
 
 > This project is partially based on the code from [2004sp-ps2port](https://github.com/johnson-cooper/2004sp-ps2port) (a C99 port of the 2004 RuneScape 2 client to PS2 and other consoles). It inherits the PS2 platform bootstrap from that project — gsKit, built-in IRX network modules (dev9/netman/smap), the PS2BUILD build system (`ps2.yaml`), and part of the UI/rendering infrastructure.
 
+<img width="1133" height="850" alt="client  _ _client_20261012150140" src="https://github.com/user-attachments/assets/41dc20a6-aea7-49a0-ac61-36a9ac128a8a" />
+
 ## Features
 
 - OTServ-era network protocol (7.4–7.72): **RSA-1024 + XTEA** handshake, login server (MOTD + character list), and game server.
