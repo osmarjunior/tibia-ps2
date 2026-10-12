@@ -143,8 +143,8 @@ static void login_screen(GSGLOBAL *gs)
          * VSync/troca de buffer antes de construir o próximo quadro. */
         gsKit_sync_flip(gs);
         gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0, 0));
-        font_draw(gs, "tibia-ps2 (fase 2-8)", 16, 16, UI_COLOR(0xFF, 0xD0, 0x40));
-        font_draw(gs, "X conecta  SELECT edita conta/senha/char", 16, 40,
+        font_draw(gs, "tibia-ps2", 16, 16, UI_COLOR(0xFF, 0xD0, 0x40));
+        font_draw(gs, "Aperte O para conectar  SELECT edita conta/senha/char", 16, 40,
                   UI_COLOR(0xC0, 0xC0, 0xC0));
         char line[96];
         snprintf(line, sizeof(line), "acc %s  char %s  @%s", cfg_account,
