@@ -1,0 +1,49 @@
+# ---- Assets proprietários do Tibia (CipSoft) — NÃO commitar ----
+# O build embute estes arquivos no ELF; obtenha-os de uma instalação
+# própria do cliente Tibia 7.60 e coloque-os na raiz antes de buildar.
+/Tibia.dat
+/Tibia.spr
+/tools/Tibia.pic
+
+# ---- Build do cliente (PS2BUILD / Docker) ----
+*.elf
+*.irx
+*.o
+*.a
+*.map
+build/
+obj/
+generated/
+
+# ---- Python (tools/ e tests/) ----
+__pycache__/
+*.py[cod]
+
+# ---- clangd ----
+.cache/
+
+# ---- Docker compose (override local) ----
+docker-compose.override.yml
+
+# ---- IDEs / editores ----
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*~
+
+# ---- Sistema operacional ----
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# macOS
+.DS_Store
+# Linux
+.directory
+
+# ---- Debug / dumps ----
+core
+*.stackdump

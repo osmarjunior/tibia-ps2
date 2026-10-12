@@ -1,0 +1,62 @@
+services:
+  # --- MariaDB para o OTHire ---
+  db:
+    image: mariadb:10.11
+    container_name: othire-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?defina DB_ROOT_PASSWORD no .env}
+      MARIADB_DATABASE: ${DB_NAME:-othire}
+      MARIADB_USER: ${DB_USER:-othire}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
+    volumes:
+      - db_data:/var/lib/mysql
+      # Executado UMA vez, na criação do volume (para reaplicar: docker compose down -v)
+      - ./MySql_Schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    # Só acessível da própria máquina (remova se não precisar acessar o banco do host)
+    ports:
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      # Conecta por TCP (o servidor temporário do initdb não escuta TCP)
+      # e só fica "healthy" quando o schema já foi carregado.
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$$MARIADB_PASSWORD" mariadb -h 127.0.0.1 -u "$$MARIADB_USER"
+          "$$MARIADB_DATABASE" -e "SELECT 1 FROM accounts LIMIT 1"
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  # --- Servidor OTHire (Tibia 7.4) ---
+  othire:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        OTHIRE_REF: ${OTHIRE_REF:-master}   # fixe um commit para builds reproduzíveis
+    container_name: othire-server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Usa o /otserv/entrypoint.sh da imagem, que gera o config.lua
+    # a partir destas variáveis.
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-othire}
+      DB_USER: ${DB_USER:-othire}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # IP anunciado aos clientes (IP da máquina na rede local, ex.: 192.168.0.10)
+      SERVER_IP: ${SERVER_IP:?defina SERVER_IP no .env (IP da máquina na rede)}
+      PASSWORD_TYPE: ${PASSWORD_TYPE:-plain}   # plain | md5 | sha1
+      SEED_TEST_DATA: ${SEED_TEST_DATA:-0}   # 1 = cria conta 111111 / senha tibia / "Ps2 Tester"
+    ports:
+      # No config.lua, login, status e admin usam a 7171; o jogo usa a 7172
+      - "7171:7171"
+      - "7172:7172"
+
+volumes:
+  db_data:

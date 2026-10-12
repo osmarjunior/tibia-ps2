@@ -1,0 +1,47 @@
+project: client
+
+targets:
+  # Tibia 7.6 networked client built by the previous Dockerfile as client.elf.
+  - name: client
+    type: ee
+    opt: -O1
+    sources:
+      - src/entry/client_net.c
+      - src/net/ps2_net.c
+      - src/net/ps2_log_stdio.c
+      - src/net/net_stream.c
+      - src/net/netmsg.c
+      - src/net/xtea.c
+      - src/net/tibia_rsa.c
+      - src/net/login.c
+      - src/net/game_protocol.c
+      - src/poc/game_map.c
+      - src/poc/map_rt.c
+      - src/poc/dat_loader.c
+      - src/poc/spr_loader.c
+      - src/poc/render_game.c
+      - src/poc/tibia_spr_data.S
+      - src/poc/tibia_dat_data.S
+      - src/ui/font.c
+      - src/ui/pad.c
+      - src/ui/vkeyboard.c
+      - src/ui/hud.c
+      - src/thirdparty/bn.c
+    defines:
+      - __PS2__
+      - POC
+      - WITH_RSA_LIBTOM
+      - 'LOGIN_HOST=\"192.168.1.2\"'
+    libs:
+      - gskit
+      - dmakit
+      - netman
+      - ps2ip
+      - patches
+      - pad
+      - m
+    embed_irx:
+      - dev9:dev9_embed
+      - netman:netman_embed
+      - smap:smap_embed
+
