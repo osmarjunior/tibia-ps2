@@ -26,6 +26,7 @@ targets:
       - src/ui/pad.c
       - src/ui/vkeyboard.c
       - src/ui/hud.c
+      - src/ui/loading.c
       - src/thirdparty/bn.c
     defines:
       - __PS2__

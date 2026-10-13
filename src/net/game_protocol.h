@@ -57,6 +57,11 @@ extern uint16_t gp_inventory[GP_INV_SLOTS]; /* 0 = vazio */
 
 void gp_set_callbacks(const GpCallbacks *cb);
 
+/* Callback de progresso do gp_enter_game (tela de loading) — mesmo
+ * formato do ps2_net_set_progress_callback() do ps2_net.c. */
+typedef void (*GpProgressCallback)(const char *stage);
+void gp_set_progress_callback(GpProgressCallback cb);
+
 /* Fluxo (Fase 2 + Fase 3): login server -> lista de chars -> game server. */
 /* 1 = ok. Em falha, gp_error() descreve. */
 int gp_enter_game(const char *account, const char *password,

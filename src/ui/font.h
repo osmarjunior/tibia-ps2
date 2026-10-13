@@ -18,6 +18,10 @@ int font_draw(GSGLOBAL *gs, const char *s, int x, int y, uint32_t color);
 int font_draw_scaled(GSGLOBAL *gs, const char *s, int x, int y,
 					 uint32_t color, int scale);
 
+/* largura em px (glyph 6x8 * scale) e x p/ texto centralizado */
+int font_text_width(const char *s, int scale);
+int font_centered_x(const char *s, int screen_w, int scale);
+
 /* painel: retângulo sólido (sem alpha — HUD) */
 void ui_rect(GSGLOBAL *gs, int x, int y, int w, int h, uint32_t color);
 

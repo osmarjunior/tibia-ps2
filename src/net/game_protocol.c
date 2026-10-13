@@ -35,6 +35,7 @@ GpContainer gp_containers[GP_CONTAINERS];
 uint16_t gp_inventory[GP_INV_SLOTS];
 
 static GpCallbacks gp_cb;
+static GpProgressCallback gp_progress_cb;
 static char gp_err[128];
 
 static int gp_fd = -1;
@@ -1446,6 +1447,17 @@ void gp_set_callbacks(const GpCallbacks *cb)
         memset(&gp_cb, 0, sizeof(gp_cb));
 }
 
+void gp_set_progress_callback(GpProgressCallback cb)
+{
+    gp_progress_cb = cb;
+}
+
+static void gp_progress(const char *stage)
+{
+    if (gp_progress_cb)
+        gp_progress_cb(stage);
+}
+
 const char *gp_error(void)
 {
     return gp_err;
@@ -1479,6 +1491,8 @@ int gp_enter_game(const char *account, const char *password,
 
     (void)loginHost;
     (void)loginPort;
+
+    gp_progress("autenticando no login server...");
 
     /* 1) login server (Fase 2) �?" a lista de chars define o game server */
     tibia_login_set_server(loginHost, loginPort);
@@ -1529,6 +1543,7 @@ int gp_enter_game(const char *account, const char *password,
     }
 
     /* 2) game server */
+    gp_progress("conectando ao game server...");
     gp_fd = net_connect(host, port, 8000);
     if (gp_fd < 0) {
         snprintf(gp_err, sizeof(gp_err), "connect ao game server %s:%u falhou",
@@ -1536,6 +1551,7 @@ int gp_enter_game(const char *account, const char *password,
         return 0;
     }
 
+    gp_progress("handshake do jogo...");
     if (send_game_first_packet(account, password, chosen->name) != 0) {
         snprintf(gp_err, sizeof(gp_err), "envio do handshake do jogo falhou");
         net_close(gp_fd);
@@ -1544,6 +1560,7 @@ int gp_enter_game(const char *account, const char *password,
     }
 
     /* espera o 0x0A + mapdesc (com tolerância a mensagens vazias) */
+    gp_progress("entrando no mundo...");
     for (int tries = 0; tries < 100 && !gp_logged_in; tries++) {
         NetMsg m;
         int r = nm_recv(gp_fd, &m, &gp_key, 5000);

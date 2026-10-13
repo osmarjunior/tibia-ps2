@@ -41,7 +41,10 @@ static void draw_panel(GSGLOBAL *gs)
 static void draw_kb(GSGLOBAL *gs, int sel_row, int sel_col, int shift,
                      const char *buf, const char *title)
 {
-    gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0, 0));
+    /* Alpha > 0 e obrigatorio: o alpha test do main (ATE=1, ATST=GREATER,
+     * AREF=0) descarta pixels com alpha 0 — um clear com alpha 0 e no-op
+     * silencioso e deixa o frame anterior "queimado" embaixo do teclado. */
+    gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0));
 
     draw_panel(gs);
 

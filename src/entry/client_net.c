@@ -45,6 +45,7 @@
 #include "../ui/pad.h"
 #include "../ui/vkeyboard.h"
 #include "../ui/hud.h"
+#include "../ui/loading.h"
 
 #define USE_MAP_RT 0  /* mesmo approach do poc.elf: RT offscreen */
 
@@ -114,8 +115,7 @@ static void clear_startup_framebuffers(GSGLOBAL *gs)
 
 static int centered_text_x(const char *text)
 {
-    int width = (int)strlen(text) * FONT_GLYPH_W * 2;
-    return width < SCREEN_W ? (SCREEN_W - width) / 2 : 8;
+    return font_centered_x(text, SCREEN_W, 2);
 }
 
 /* ---------------- cursor de alvo ---------------- */
@@ -125,7 +125,7 @@ static int cur_dx = 0, cur_dy = 0; /* relativo ao player, -3..3 */
 
 static void wait_screen(GSGLOBAL *gs, const char *line1, const char *line2)
 {
-    gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0, 0));
+    gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0));
     font_draw(gs, line1, centered_text_x(line1), 200,
               UI_COLOR(0xFF, 0xFF, 0xFF));
     if (line2)
@@ -142,7 +142,7 @@ static void login_screen(GSGLOBAL *gs)
         /* Mantém a mesma cadência da POC e do loop de jogo: espera o
          * VSync/troca de buffer antes de construir o próximo quadro. */
         gsKit_sync_flip(gs);
-        gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0, 0));
+        gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0));
         font_draw(gs, "tibia-ps2", 16, 16, UI_COLOR(0xFF, 0xD0, 0x40));
         font_draw(gs, "Aperte O para conectar  SELECT edita conta/senha/char", 16, 40,
                   UI_COLOR(0xC0, 0xC0, 0xC0));
@@ -169,14 +169,79 @@ static void login_screen(GSGLOBAL *gs)
     }
 }
 
+/* ---------------- tela de loading: progresso por estágio ----------------
+ * Mesma abordagem do load_archive() do 2004sp-ps2port (repo de
+ * referência): percentual FIXO por marco, não medido. Strings de espera
+ * ("... X s") casam por prefixo e mantêm o percent do estágio — o texto
+ * já carrega os segundos decorridos. */
+
+typedef struct {
+    const char *prefix;
+    int percent;
+} StagePercent;
+
+static int stage_percent(const StagePercent *map, int n, const char *stage,
+                         int fallback)
+{
+    for (int i = 0; i < n; i++) {
+        if (strncmp(stage, map[i].prefix, strlen(map[i].prefix)) == 0)
+            return map[i].percent;
+    }
+    return fallback;
+}
+
+/* Estágios reportados por ps2_net_init() (ps2_net.c). */
+static void net_progress_cb(const char *stage)
+{
+    static const StagePercent map[] = {
+        {"Iniciando RPC", 5},     {"Carregando DEV9", 12},
+        {"Carregando NETMAN", 18}, {"Carregando SMAP", 24},
+        {"Iniciando NetMan", 30},  {"Esperando link Ethernet", 38},
+        {"Sem link Ethernet", 38}, {"Timeout: link", 38},
+        {"Inicializando TCP", 50}, {"Lendo configuracao", 56},
+        {"Habilitando DHCP", 62},  {"Esperando endereco DHCP", 70},
+        {"DHCP pendente", 70},     {"Timeout DHCP", 82},
+        {"DHCP falhou", 90},       {"DHCP concluido", 100},
+    };
+    loading_draw(gsGlobal, stage,
+                 stage_percent(map, (int)(sizeof(map) / sizeof(map[0])),
+                              stage, 45));
+}
+
+/* Estágios reportados por gp_enter_game() (game_protocol.c). */
+static void gp_progress_cb(const char *stage)
+{
+    static const StagePercent map[] = {
+        {"autenticando", 10},
+        {"conectando ao game server", 40},
+        {"handshake do jogo", 60},
+        {"entrando no mundo", 75},
+    };
+    loading_draw(gsGlobal, stage,
+                 stage_percent(map, (int)(sizeof(map) / sizeof(map[0])),
+                              stage, 45));
+}
+
 static void try_connect(GSGLOBAL *gs)
 {
-    wait_screen(gs, "conectando ao login server...", NULL);
+    /* Rede: os estágios do ps2_net_init() desenham na tela de loading
+     * via callback (mesmo mecanismo do net_test.c). ps2_net_init() é
+     * bloqueante — DHCP pode levar ~20s; sem isso a tela congela. */
+    ps2_net_set_progress_callback(net_progress_cb);
 
     if (ps2_net_init() != 0) {
-        wait_screen(gs, "rede indisponivel (X volta)", NULL);
-        while (!(pad2_read_edge(NULL) & PAD_BTN_CROSS))
+        /* Redesenhar a CADA iteração: um flip sem redraw alterna os dois
+         * framebuffers (o último frame de loading fica preso em um deles
+         * e a tela pisca — só era invisível quando ambos eram pretos). */
+        const char *msg = "rede indisponivel (X volta)";
+        wait_screen(gs, msg, NULL);
+        while (!(pad2_read_edge(NULL) & PAD_BTN_CROSS)) {
             gsKit_sync_flip(gs);
+            gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0));
+            font_draw(gs, msg, centered_text_x(msg), 200,
+                      UI_COLOR(0xFF, 0xFF, 0xFF));
+            gsKit_queue_exec(gs);
+        }
         return;
     }
 
@@ -190,7 +255,9 @@ static void try_connect(GSGLOBAL *gs)
     net_set_stream(ps2_net_stream());
     tibia_login_set_server(LOGIN_HOST, LOGIN_PORT);
 
-    wait_screen(gs, "entrando no mundo...", NULL);
+    /* Entrada no mundo: os estágios do gp_enter_game() (RSA/login,
+     * game server, mapa) desenham via callback próprio. */
+    gp_set_progress_callback(gp_progress_cb);
     if (gp_enter_game(cfg_account, cfg_password, cfg_char, LOGIN_HOST,
                       LOGIN_PORT, LOGIN_HOST, 7172)) {
         connected = 1;
@@ -202,7 +269,7 @@ static void try_connect(GSGLOBAL *gs)
     wait_screen(gs, "login falhou (X volta)", msg);
     while (!(pad2_read_edge(NULL) & PAD_BTN_CROSS)) {
         gsKit_sync_flip(gs);
-        gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0, 0));
+        gsKit_clear(gs, GS_SETREG_RGBAQ(0, 0, 0, 0x80, 0));
         const char *title = "login falhou (X volta)";
         font_draw(gs, title, centered_text_x(title), 200,
                   UI_COLOR(0xFF, 0xFF, 0xFF));
@@ -309,6 +376,10 @@ int main(void)
     gsGlobal->ZBuffering = GS_SETTING_OFF;
     gsGlobal->PrimAlphaEnable = GS_SETTING_ON;
     gsKit_set_primalpha(gsGlobal, 0, 0);
+    /* Alpha test: descarta pixels com alpha 0. Consequencia para TODO
+     * gsKit_clear de tela cheia: precisa de alpha > 0 (o loop do jogo
+     * usa 0xFF, as telas de UI 0x80) — clear com alpha 0 e no-op
+     * silencioso e deixa o frame anterior "queimado" no buffer. */
     gsGlobal->Test->ATE = 1;
     gsGlobal->Test->ATST = 6;
     gsGlobal->Test->AREF = 0;
@@ -325,11 +396,15 @@ int main(void)
         printf("client_net: map_framebuffer_init falhou\n");
 #endif
 
-    spr_loader_init();
-    dat_loader_init();
+    /* Fonte ANTES dos loaders: a tela de loading precisa dela (font_init
+     * só depende de gsGlobal + VRAM; nenhum loader toca VRAM aqui). */
     if (font_init(gsGlobal) != 0) {
         printf("fonte falhou — HUD ficará sem texto\n");
     }
+    loading_draw(gsGlobal, "carregando dados...", 30);
+    spr_loader_init();
+    dat_loader_init();
+    loading_draw(gsGlobal, "preparando interface...", 70);
     /* placeholders do inventário: precisam de VRAM ANTES do cache
      * de sprites, que reserva toda a restante na 1a carga */
     hud_init(gsGlobal);

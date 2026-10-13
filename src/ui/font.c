@@ -110,3 +110,16 @@ void ui_rect(GSGLOBAL *gs, int x, int y, int w, int h, uint32_t color)
     gsKit_prim_sprite(gs, (float)x, (float)y, (float)(x + w), (float)(y + h),
                       0, GS_SETREG_RGBAQ((u8)r, (u8)g, (u8)b, 0x80, 0));
 }
+
+int font_text_width(const char *s, int scale)
+{
+    if (!s || scale < 1)
+        return 0;
+    return (int)strlen(s) * FONT_GLYPH_W * scale;
+}
+
+int font_centered_x(const char *s, int screen_w, int scale)
+{
+    int width = font_text_width(s, scale);
+    return width < screen_w ? (screen_w - width) / 2 : 8;
+}
